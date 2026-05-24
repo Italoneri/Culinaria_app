@@ -1,0 +1,16 @@
+export const T = {
+  bg: '#0D0D0D',
+  card: '#1A1A1A',
+  cardElev: '#222222',
+  border: 'rgba(255,255,255,0.06)',
+  borderStrong: 'rgba(255,255,255,0.1)',
+  amber: '#E8A020',
+  amberSoft: 'rgba(232,160,32,0.14)',
+  amberMid: 'rgba(232,160,32,0.22)',
+  text: '#F5F2EC',
+  textMuted: 'rgba(245,242,236,0.62)',
+  textDim: 'rgba(245,242,236,0.38)',
+  good: '#7BB069',
+  display: '"Instrument Serif", Georgia, serif',
+  sans: '"Manrope", -apple-system, system-ui, sans-serif',
+} as const;

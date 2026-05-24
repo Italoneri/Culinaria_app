@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+:root {
+  --font-manrope: 'Manrope', -apple-system, system-ui, sans-serif;
+  --font-instrument-serif: 'Instrument Serif', Georgia, serif;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #0D0D0D;
+  color: #F5F2EC;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Fluid mobile viewport: 360px–412px */
+body {
+  min-width: 360px;
+  max-width: 412px;
+  margin: 0 auto;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+}
+
+/* Hide scrollbars on chip rows */
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+input, textarea {
+  font-family: inherit;
+}
