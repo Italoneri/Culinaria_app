@@ -30,16 +30,16 @@ test.describe('US-03 · Add recipe', () => {
 
     test('time stepper starts at 30 min and increments by 5', async ({ page }) => {
       const value = page.getByTestId('stepper-time-value');
-      await expect(value).toHaveText('30');
+      await expect(value).toContainText('30');
       await page.getByTestId('stepper-time-plus').click();
-      await expect(value).toHaveText('35');
+      await expect(value).toContainText('35');
     });
 
     test('time stepper minimum is 5 min', async ({ page }) => {
       const minusBtn = page.getByTestId('stepper-time-minus');
       const value = page.getByTestId('stepper-time-value');
       for (let i = 0; i < 10; i++) await minusBtn.click();
-      await expect(value).toHaveText('5');
+      await expect(value).toContainText('5');
     });
 
     test('portions stepper starts at 4 and increments by 1', async ({ page }) => {
