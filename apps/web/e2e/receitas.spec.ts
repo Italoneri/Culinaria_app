@@ -91,7 +91,7 @@ test.describe('US-05 · Listagem de receitas', () => {
 
     test('chips de categoria são horizontalmente scrolláveis', async ({ page }) => {
       const chipBar = page.locator('[data-testid^="category-chip-"]').first().locator('..');
-      const overflowX = await chipBar.evaluate(el => getComputedStyle(el.parentElement!).overflowX);
+      const overflowX = await chipBar.evaluate(el => getComputedStyle(el).overflowX);
       expect(['auto', 'scroll']).toContain(overflowX);
     });
   });
