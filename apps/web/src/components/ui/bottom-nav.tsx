@@ -76,6 +76,7 @@ export function BottomNav() {
         return (
           <button
             key={tab.id}
+            data-testid={`nav-${tab.id}`}
             onClick={() => handleTabClick(tab.href)}
             style={{
               flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
