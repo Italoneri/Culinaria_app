@@ -1,13 +1,11 @@
 import { notFound } from 'next/navigation';
-import { RECIPES } from '@/lib/data';
+import { fetchPublicRecipe } from '@/lib/db';
 import { DetailClient } from './detail-client';
 
-export function generateStaticParams() {
-  return RECIPES.map(r => ({ id: r.id }));
-}
+export const dynamic = 'force-dynamic';
 
-export default function RecipeDetailPage({ params }: { params: { id: string } }) {
-  const recipe = RECIPES.find(r => r.id === params.id);
+export default async function RecipeDetailPage({ params }: { params: { id: string } }) {
+  const recipe = await fetchPublicRecipe(params.id);
   if (!recipe) notFound();
   return <DetailClient recipe={recipe} />;
 }

@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { CATEGORIES } from '@/lib/data';
 import { T } from '@/lib/tokens';
 import { useNavGuard } from '@/components/ui/nav-guard-context';
+import { useAuth } from '@/lib/auth-context';
+import { createRecipe } from '@/lib/api-client';
 import { IconBack, IconPlus, IconClock, IconUsers, IconSignal, IconCamera, IconBookmarkFill } from '@/components/ui/icons';
 
 const DIFFS = ['Fácil', 'Médio', 'Difícil'] as const;
@@ -12,6 +14,7 @@ const DIFFS = ['Fácil', 'Médio', 'Difícil'] as const;
 export default function AddScreen() {
   const router = useRouter();
   const { registerGuard, unregisterGuard } = useNavGuard();
+  const { session } = useAuth();
 
   const [name, setName] = useState('');
   const [category, setCategory] = useState('Jantar');
@@ -23,6 +26,8 @@ export default function AddScreen() {
   const [steps, setSteps] = useState(['', '']);
   const [errors, setErrors] = useState<{ name?: string; ingredients?: string; steps?: string }>({});
   const [discardDialog, setDiscardDialog] = useState<{ open: boolean; pendingHref?: string }>({ open: false });
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   const cats = CATEGORIES.map(c => c.name);
 
@@ -76,11 +81,32 @@ export default function AddScreen() {
     return Object.keys(e).length === 0;
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!validate()) return;
-    // TODO: integrar com POST /api/recipes
-    unregisterGuard();
-    router.push('/');
+    if (!session?.access_token) return;
+    setSaving(true);
+    setSaveError('');
+    try {
+      await createRecipe({
+        name: name.trim(),
+        category,
+        time_min: time,
+        difficulty,
+        portions,
+        notes: notes.trim() || undefined,
+        is_public: false,
+        ingredients: ingredients.filter(i => i.trim()),
+        steps: steps
+          .filter(s => s.trim())
+          .map((s, i) => ({ title: `Passo ${i + 1}`, body: s.trim() })),
+      }, session.access_token);
+      unregisterGuard();
+      router.push('/');
+    } catch {
+      setSaveError('Erro ao salvar. Tente novamente.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -329,15 +355,25 @@ export default function AddScreen() {
         padding: '20px 24px 28px', maxWidth: 412, margin: '0 auto',
         background: 'linear-gradient(180deg, rgba(13,13,13,0) 0%, rgba(13,13,13,0.95) 30%, rgba(13,13,13,1) 100%)',
       }}>
-        <button onClick={handleSave} style={{
+        {saveError && (
+          <div style={{
+            marginBottom: 10, padding: '10px 14px', borderRadius: 12,
+            background: 'rgba(255,80,80,0.08)', border: '1px solid rgba(255,80,80,0.2)',
+            fontFamily: T.sans, fontSize: 13, color: '#ff6b6b', fontWeight: 500, textAlign: 'center',
+          }}>{saveError}</div>
+        )}
+        <button onClick={handleSave} disabled={saving} style={{
           width: '100%', height: 58, borderRadius: 18,
-          background: T.amber, border: 'none', color: '#0D0D0D',
+          background: saving ? T.amberSoft : T.amber,
+          border: 'none', color: saving ? T.amber : '#0D0D0D',
           fontFamily: T.sans, fontSize: 15.5, fontWeight: 700,
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-          boxShadow: '0 10px 30px rgba(232,160,32,0.35), inset 0 1px 0 rgba(255,255,255,0.3)',
+          boxShadow: saving ? 'none' : '0 10px 30px rgba(232,160,32,0.35), inset 0 1px 0 rgba(255,255,255,0.3)',
+          cursor: saving ? 'not-allowed' : 'pointer',
+          transition: 'all .15s',
         }}>
           <IconBookmarkFill style={{ width: 18, height: 18 }} />
-          Salvar receita
+          {saving ? 'Salvando…' : 'Salvar receita'}
         </button>
       </div>
 

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Manrope, Instrument_Serif } from 'next/font/google';
+import { AuthProvider } from '@/lib/auth-context';
 import './globals.css';
 
 const manrope = Manrope({
@@ -45,7 +46,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
       </head>
       <body style={{ background: '#0D0D0D', margin: 0, padding: 0, fontFamily: 'var(--font-manrope), -apple-system, system-ui, sans-serif' }}>
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
         <script dangerouslySetInnerHTML={{ __html: `if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js'))` }} />
       </body>
     </html>

@@ -144,7 +144,7 @@ export default function ProfileScreen() {
           }}>
             <div style={{
               height: 130, position: 'relative',
-              backgroundImage: `url(${r.img})`, backgroundSize: 'cover', backgroundPosition: 'center',
+              backgroundImage: `url(${r.img_url})`, backgroundSize: 'cover', backgroundPosition: 'center',
             }}>
               <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0) 50%, rgba(0,0,0,0.55) 100%)' }} />
               <button onClick={e => e.preventDefault()} style={{
@@ -165,7 +165,7 @@ export default function ProfileScreen() {
               } as React.CSSProperties}>{r.name}</div>
               <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: T.textMuted, fontWeight: 500 }}>
                 <IconClock style={{ width: 11, height: 11 }} />
-                {r.time} min
+                {r.time_min} min
                 <span style={{ width: 3, height: 3, borderRadius: 2, background: T.textDim, margin: '0 2px' }} />
                 <span style={{ color: T.amber }}>{r.difficulty}</span>
               </div>

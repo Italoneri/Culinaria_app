@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Recipe } from '@/lib/data';
+import { useFavorite } from '@/lib/use-favorite';
 import { T } from '@/lib/tokens';
 import { Pill } from '@/components/ui/pill';
 import {
@@ -16,9 +17,9 @@ export function DetailClient({ recipe }: { recipe: Recipe }) {
   const router = useRouter();
   const [checked, setChecked] = useState<Record<number, boolean>>({});
   const [tab, setTab] = useState<Tab>('ingredients');
-  const [saved, setSaved] = useState(false);
+  const { favorited, toggle } = useFavorite(recipe.id);
 
-  const toggle = (i: number) => setChecked(c => ({ ...c, [i]: !c[i] }));
+  const toggleCheck = (i: number) => setChecked(c => ({ ...c, [i]: !c[i] }));
 
   return (
     <div data-testid="detail-screen" style={{ minHeight: '100dvh', background: T.bg, position: 'relative' }}>
@@ -26,7 +27,7 @@ export function DetailClient({ recipe }: { recipe: Recipe }) {
         {/* Hero */}
         <div data-testid="detail-hero" style={{
           position: 'relative', height: 380,
-          backgroundImage: `url(${recipe.img})`, backgroundSize: 'cover', backgroundPosition: 'center',
+          backgroundImage: `url(${recipe.img_url})`, backgroundSize: 'cover', backgroundPosition: 'center',
         }}>
           <div style={{
             position: 'absolute', inset: 0,
@@ -46,7 +47,7 @@ export function DetailClient({ recipe }: { recipe: Recipe }) {
                 border: `1px solid ${T.borderStrong}`, color: T.text,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}><IconShare /></button>
-              <button data-testid="btn-bookmark" data-saved={saved ? 'true' : 'false'} onClick={() => setSaved(s => !s)} style={{
+              <button data-testid="btn-bookmark" data-saved={favorited ? 'true' : 'false'} onClick={toggle} style={{
                 width: 42, height: 42, borderRadius: 14,
                 background: T.amber, border: 'none', color: '#0D0D0D',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -72,19 +73,19 @@ export function DetailClient({ recipe }: { recipe: Recipe }) {
           <p data-testid="detail-description" style={{
             fontFamily: T.sans, fontSize: 14, color: T.textMuted,
             lineHeight: 1.55, margin: '12px 0 0', fontWeight: 500,
-          }}>{recipe.desc}</p>
+          }}>{recipe.description}</p>
         </div>
 
         {/* Stat pills */}
         <div style={{ display: 'flex', gap: 8, padding: '22px 24px 0' }}>
           <div data-testid="pill-tempo" data-accent="true">
-            <Pill icon={<IconClock />} label="Tempo" value={`${recipe.time}m`} accent />
+            <Pill icon={<IconClock />} label="Tempo" value={`${recipe.time_min}m`} accent />
           </div>
           <div data-testid="pill-porções">
             <Pill icon={<IconUsers />} label="Porções" value={recipe.portions} />
           </div>
           <div data-testid="pill-kcal">
-            <Pill icon={<IconFlame />} label="kcal" value={recipe.calories} />
+            <Pill icon={<IconFlame />} label="kcal" value={recipe.calories ?? '—'} />
           </div>
           <div data-testid="pill-nível">
             <Pill icon={<IconSignal />} label="Nível" value={recipe.difficulty} />
@@ -116,7 +117,7 @@ export function DetailClient({ recipe }: { recipe: Recipe }) {
         {tab === 'ingredients' ? (
           <div data-testid="ingredients-list" style={{ padding: '22px 24px 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
             {recipe.ingredients.map((ing, i) => (
-              <div data-testid="ingredient-item" key={i} onClick={() => toggle(i)} style={{
+              <div data-testid="ingredient-item" key={i} onClick={() => toggleCheck(i)} style={{
                 display: 'flex', alignItems: 'center', gap: 14,
                 padding: '14px 16px', borderRadius: 14,
                 background: T.card, border: `1px solid ${T.border}`,
@@ -158,10 +159,10 @@ export function DetailClient({ recipe }: { recipe: Recipe }) {
                 }}>{String(i + 1).padStart(2, '0')}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div data-testid="step-title" style={{ fontFamily: T.sans, fontSize: 15, fontWeight: 700, color: T.text, marginBottom: 4 }}>
-                    {s.t}
+                    {s.title}
                   </div>
                   <div data-testid="step-description" style={{ fontFamily: T.sans, fontSize: 13.5, color: T.textMuted, lineHeight: 1.5, fontWeight: 500 }}>
-                    {s.d}
+                    {s.body}
                   </div>
                   {s.tip && (
                     <div data-testid="chef-tip" style={{
@@ -202,7 +203,7 @@ export function DetailClient({ recipe }: { recipe: Recipe }) {
         }}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
           Iniciar preparo
-          <span data-testid="cta-time" style={{ marginLeft: 'auto', fontSize: 12, opacity: 0.7, fontWeight: 600 }}>{recipe.time}m</span>
+          <span data-testid="cta-time" style={{ marginLeft: 'auto', fontSize: 12, opacity: 0.7, fontWeight: 600 }}>{recipe.time_min}m</span>
         </button>
       </div>
     </div>
