@@ -1,6 +1,6 @@
 # ADR-0002 — Stack backend: Hono + Bun
 
-**Status:** Aceito
+**Status:** Substituído por [ADR-0009](ADR-0009-remocao-api-hono.md) em 2026-08-20
 **Data:** 2026-05-24
 
 ## Contexto
