@@ -6,6 +6,11 @@ import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import { T } from '@/lib/tokens';
 
+const CALLBACK_ERRORS: Record<string, string> = {
+  missing_code: 'Link de confirmação incompleto. Peça um novo email.',
+  invalid_code: 'Link de confirmação expirado ou já usado. Entre com email e senha.',
+};
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -14,7 +19,7 @@ function LoginForm() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState(CALLBACK_ERRORS[searchParams.get('error') ?? ''] ?? '');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {

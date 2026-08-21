@@ -45,7 +45,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = async (email: string, password: string) => {
     const supabase = createSupabaseBrowserClient();
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+    });
     // Sem sessão de volta, o projeto exige confirmação por email antes do login
     return { error: error?.message ?? null, needsConfirmation: !error && !data.session };
   };
