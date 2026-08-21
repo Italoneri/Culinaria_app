@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createSupabaseServerClient } from './supabase-server'
-import { RECIPE_CATEGORIES, DIFFICULTIES } from './data'
+import { RECIPE_CATEGORIES, DIFFICULTIES, IMAGE_BUCKET } from './data'
 
 const difficultySchema = z.enum(DIFFICULTIES)
 const categorySchema = z.enum(RECIPE_CATEGORIES)
@@ -42,6 +42,25 @@ export type ActionResult<T = void> =
   | { ok: false; error: string }
 
 const UNAUTHENTICATED = 'Sessão expirada. Entre novamente.'
+const INVALID_IMAGE = 'Imagem inválida: só são aceitas imagens enviadas pelo próprio app.'
+
+const STORAGE_PUBLIC_BASE = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${IMAGE_BUCKET}/`
+
+/**
+ * A URL da imagem chega pronta do client, então precisa ser confinada ao bucket
+ * e à pasta do próprio usuário — sem isso qualquer URL externa seria persistida
+ * e servida como se fosse a foto da receita. `new URL` normaliza `..`, então
+ * travessia de path não escapa do prefixo esperado.
+ */
+function isOwnStorageUrl(candidate: string, userId: string): boolean {
+  try {
+    const parsed = new URL(candidate)
+    const expected = new URL(`${STORAGE_PUBLIC_BASE}${userId}/`)
+    return parsed.origin === expected.origin && parsed.pathname.startsWith(expected.pathname)
+  } catch {
+    return false
+  }
+}
 
 /**
  * Cria a receita e suas linhas filhas. O `id` vem pronto do client para que a
@@ -58,6 +77,10 @@ export async function createRecipe(input: CreateRecipeInput): Promise<ActionResu
   if (!user) return { ok: false, error: UNAUTHENTICATED }
 
   const { ingredients, steps, ...recipe } = parsed.data
+
+  if (recipe.img_url && !isOwnStorageUrl(recipe.img_url, user.id)) {
+    return { ok: false, error: INVALID_IMAGE }
+  }
 
   const { error: recipeError } = await supabase
     .from('recipes')
@@ -124,6 +147,10 @@ export async function updateProfile(input: UpdateProfileInput): Promise<ActionRe
   const supabase = createSupabaseServerClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { ok: false, error: UNAUTHENTICATED }
+
+  if (parsed.data.avatar_url && !isOwnStorageUrl(parsed.data.avatar_url, user.id)) {
+    return { ok: false, error: INVALID_IMAGE }
+  }
 
   const { error } = await supabase
     .from('profiles')
