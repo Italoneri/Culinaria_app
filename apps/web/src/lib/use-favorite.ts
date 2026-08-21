@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { addFavorite, removeFavorite } from './api-client';
+import { toggleFavorite } from './actions';
 import { useAuth } from './auth-context';
 
 export function useFavorite(recipeId: string, initialFavorited = false) {
@@ -10,22 +10,17 @@ export function useFavorite(recipeId: string, initialFavorited = false) {
   const [pending, setPending] = useState(false);
 
   const toggle = useCallback(async (e: React.MouseEvent) => {
-    e.preventDefault();
-    if (!session?.access_token || pending) return;
+    e.preventDefault(); // o botão vive dentro do Link do card
+    if (!session || pending) return;
+
     const next = !favorited;
-    setFavorited(next); // optimistic
+    setFavorited(next); // otimista
     setPending(true);
-    try {
-      if (next) {
-        await addFavorite(recipeId, session.access_token);
-      } else {
-        await removeFavorite(recipeId, session.access_token);
-      }
-    } catch {
-      setFavorited(!next); // rollback on error
-    } finally {
-      setPending(false);
-    }
+
+    const result = await toggleFavorite(recipeId, next);
+    if (!result.ok) setFavorited(!next);
+
+    setPending(false);
   }, [recipeId, session, favorited, pending]);
 
   return { favorited, toggle, authenticated: !!session };

@@ -5,7 +5,8 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  // Chromium headless crasha em cascata no Windows com paralelismo (BUG-003 — 0xC0000142)
+  workers: process.env.CI || process.platform === 'win32' ? 1 : undefined,
   reporter: [['html'], ['list']],
   use: {
     baseURL: process.env.BASE_URL ?? 'http://localhost:3000',
@@ -23,7 +24,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm run dev',
+    command: 'pnpm dev',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

@@ -9,6 +9,7 @@ import type { Recipe, Category } from '@/lib/data';
 type Props = {
   recipes: Recipe[];
   categories: Category[];
+  favoriteIds: string[];
 };
 
 function toSlug(name: string) {
@@ -19,7 +20,8 @@ function toSlug(name: string) {
     .replace(/\s+/g, '-');
 }
 
-export function ReceitasClient({ recipes, categories }: Props) {
+export function ReceitasClient({ recipes, categories, favoriteIds }: Props) {
+  const favorited = new Set(favoriteIds);
   const [selectedCategory, setSelectedCategory] = useState('Todas');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -148,7 +150,7 @@ export function ReceitasClient({ recipes, categories }: Props) {
           }}
         >
           {filteredRecipes.map(r => (
-            <RecipeCard key={r.id} recipe={r} />
+            <RecipeCard key={r.id} recipe={r} favorited={favorited.has(r.id)} />
           ))}
         </div>
       )}

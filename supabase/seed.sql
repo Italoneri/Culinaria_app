@@ -1,15 +1,28 @@
 -- Dev seed — dados do handoff (data.js)
--- Requer um usuário de dev criado previamente com ID abaixo
+-- O dono é o primeiro usuário real de auth.users: cadastre-se em /auth/cadastro antes de rodar.
 
 DO $$
 DECLARE
-  dev_user_id uuid := '00000000-0000-0000-0000-000000000001';
+  dev_user_id uuid;
   r1 uuid; r2 uuid; r3 uuid; r4 uuid; r5 uuid; r6 uuid;
 BEGIN
-  -- Ensure dev profile exists
-  INSERT INTO profiles (id, username, bio, is_premium)
-  VALUES (dev_user_id, 'Mariana Silva', 'Cozinheira amadora apaixonada por massas, pães e tudo que leva manteiga', true)
-  ON CONFLICT (id) DO NOTHING;
+  SELECT id INTO dev_user_id FROM auth.users ORDER BY created_at LIMIT 1;
+
+  IF dev_user_id IS NULL THEN
+    RAISE EXCEPTION 'auth.users vazio — crie uma conta em /auth/cadastro antes de rodar o seed';
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM recipes WHERE owner_id = dev_user_id) THEN
+    RAISE NOTICE 'seed já aplicado para o usuário %, nada a fazer', dev_user_id;
+    RETURN;
+  END IF;
+
+  -- O trigger handle_new_user já criou a linha em profiles no signup
+  UPDATE profiles
+  SET username = 'Mariana Silva',
+      bio = 'Cozinheira amadora apaixonada por massas, pães e tudo que leva manteiga',
+      is_premium = true
+  WHERE id = dev_user_id;
 
   -- Recipes
   INSERT INTO recipes (id, owner_id, name, category, time_min, difficulty, portions, calories, img_url, description, is_public)
@@ -73,6 +86,84 @@ BEGIN
     (r1, 2, 'Tostar o arroz', 'Junte o arroz e mexa por 2 min até ficar perolado. Adicione o vinho e mexa até evaporar.', null),
     (r1, 3, 'Adicionar o caldo', 'Adicione o caldo quente uma concha por vez, mexendo até cada porção ser absorvida.', null),
     (r1, 4, 'Finalização', 'Quando al dente, desligue o fogo. Adicione parmesão, manteiga gelada e azeite de trufa. Mexa enérgico para emulsionar.', 'A "mantecatura" final é o segredo — bata bem para incorporar ar e ficar cremoso.');
+
+  -- Ingredients + steps r2 (Salmão)
+  INSERT INTO recipe_ingredients (recipe_id, position, text) VALUES
+    (r2, 0, '2 filés de salmão (180g cada)'),
+    (r2, 1, '1 maço de aspargos'),
+    (r2, 2, '1 limão siciliano'),
+    (r2, 3, 'Azeite extra-virgem'),
+    (r2, 4, 'Sal em flocos'),
+    (r2, 5, 'Pimenta-do-reino');
+
+  INSERT INTO recipe_steps (recipe_id, position, title, body, tip) VALUES
+    (r2, 0, 'Tempere o salmão', 'Seque os filés com papel-toalha. Tempere com sal e pimenta dos dois lados.', null),
+    (r2, 1, 'Aqueça a frigideira', 'Aqueça uma frigideira de fundo grosso em fogo médio-alto com um fio de azeite até fumegar levemente.', null),
+    (r2, 2, 'Sele pela pele', 'Coloque o salmão com a pele para baixo. Pressione com uma espátula por 30 segundos. Cozinhe 4 minutos sem mexer.', 'Não mova o peixe — a pele só solta sozinha quando estiver crocante.'),
+    (r2, 3, 'Vire e finalize', 'Vire e cozinhe mais 2 minutos. Esprema o limão por cima.', null),
+    (r2, 4, 'Aspargos', 'Em outra frigideira, grelhe os aspargos por 4-5 min com azeite e sal em flocos.', null);
+
+  -- Ingredients + steps r3 (Panquecas)
+  INSERT INTO recipe_ingredients (recipe_id, position, text) VALUES
+    (r3, 0, '200g de ricota fresca'),
+    (r3, 1, '2 ovos separados'),
+    (r3, 2, '80g de farinha'),
+    (r3, 3, '50ml de leite'),
+    (r3, 4, '1 colher de chá de fermento'),
+    (r3, 5, 'Mel cru'),
+    (r3, 6, 'Raspas de limão');
+
+  INSERT INTO recipe_steps (recipe_id, position, title, body, tip) VALUES
+    (r3, 0, 'Misture os secos', 'Em uma tigela, misture farinha e fermento.', null),
+    (r3, 1, 'Bata as gemas', 'Em outra tigela, bata as gemas com ricota e leite até ficar liso.', null),
+    (r3, 2, 'Claras em neve', 'Bata as claras em ponto de neve firme e incorpore delicadamente à mistura.', 'Incorpore com movimentos de baixo para cima para não perder o ar.'),
+    (r3, 3, 'Frite', 'Em frigideira antiaderente, faça panquecas pequenas. Vire quando aparecerem bolhas na superfície.', null),
+    (r3, 4, 'Sirva', 'Empilhe, regue com mel e finalize com raspas de limão fresco.', null);
+
+  -- Ingredients + steps r4 (Brownie)
+  INSERT INTO recipe_ingredients (recipe_id, position, text) VALUES
+    (r4, 0, '200g de chocolate 70%'),
+    (r4, 1, '150g de manteiga'),
+    (r4, 2, '3 ovos'),
+    (r4, 3, '180g de açúcar mascavo'),
+    (r4, 4, '80g de farinha'),
+    (r4, 5, '40g de cacau em pó'),
+    (r4, 6, 'Pitada de flor de sal');
+
+  INSERT INTO recipe_steps (recipe_id, position, title, body, tip) VALUES
+    (r4, 0, 'Derreta', 'Derreta o chocolate com a manteiga em banho-maria. Reserve para amornar.', null),
+    (r4, 1, 'Bata ovos e açúcar', 'Bata os ovos com açúcar por 5 minutos até triplicar de volume e ficar bem claro.', 'Esse passo cria a casquinha brilhante característica do brownie.'),
+    (r4, 2, 'Misture', 'Incorpore o chocolate amornado, depois farinha e cacau peneirados.', null),
+    (r4, 3, 'Asse', 'Forno a 170°C por 25 minutos. O centro deve permanecer levemente molhado.', null);
+
+  -- Ingredients + steps r5 (Tartar)
+  INSERT INTO recipe_ingredients (recipe_id, position, text) VALUES
+    (r5, 0, '200g de atum sashimi'),
+    (r5, 1, '1 abacate maduro'),
+    (r5, 2, '1 cebolinha'),
+    (r5, 3, 'Shoyu'),
+    (r5, 4, 'Óleo de gergelim'),
+    (r5, 5, 'Gergelim torrado'),
+    (r5, 6, 'Limão tahiti');
+
+  INSERT INTO recipe_steps (recipe_id, position, title, body, tip) VALUES
+    (r5, 0, 'Corte o atum', 'Corte em cubos pequenos de 0,5cm com faca bem afiada.', 'Mantenha o atum gelado até a hora de cortar.'),
+    (r5, 1, 'Tempere', 'Misture com shoyu, óleo de gergelim, cebolinha e suco de limão.', null),
+    (r5, 2, 'Monte', 'Em um aro, faça uma camada de abacate amassado e por cima o atum. Finalize com gergelim.', null);
+
+  -- Ingredients + steps r6 (Burrata)
+  INSERT INTO recipe_ingredients (recipe_id, position, text) VALUES
+    (r6, 0, '1 burrata fresca'),
+    (r6, 1, '2 pêssegos maduros'),
+    (r6, 2, 'Manjericão fresco'),
+    (r6, 3, 'Rúcula'),
+    (r6, 4, 'Vinagre balsâmico envelhecido'),
+    (r6, 5, 'Azeite extra-virgem');
+
+  INSERT INTO recipe_steps (recipe_id, position, title, body, tip) VALUES
+    (r6, 0, 'Corte os pêssegos', 'Corte em gomos generosos, descartando o caroço.', null),
+    (r6, 1, 'Monte', 'Distribua rúcula no prato, adicione pêssegos e a burrata inteira no centro.', null),
+    (r6, 2, 'Finalize', 'Regue com azeite, balsâmico, sal em flocos e manjericão rasgado à mão.', null);
 
   -- Seed favorites
   INSERT INTO favorites (user_id, recipe_id) VALUES

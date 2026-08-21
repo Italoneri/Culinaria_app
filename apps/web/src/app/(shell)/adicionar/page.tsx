@@ -1,15 +1,29 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { CATEGORIES } from '@/lib/data';
+import { CATEGORIES, DIFFICULTIES } from '@/lib/data';
+import type { RecipeCategory, Difficulty } from '@/lib/data';
 import { T } from '@/lib/tokens';
 import { useNavGuard } from '@/components/ui/nav-guard-context';
 import { useAuth } from '@/lib/auth-context';
-import { createRecipe } from '@/lib/api-client';
+import { createRecipe } from '@/lib/actions';
+import { uploadImage } from '@/lib/supabase';
 import { IconBack, IconPlus, IconClock, IconUsers, IconSignal, IconCamera, IconBookmarkFill } from '@/components/ui/icons';
 
-const DIFFS = ['Fácil', 'Médio', 'Difícil'] as const;
+const DIFFS = DIFFICULTIES;
+const DRAFT_KEY = 'saveur:draft:new-recipe';
+
+type Draft = {
+  name: string;
+  category: RecipeCategory;
+  time: number;
+  portions: number;
+  difficulty: Difficulty;
+  notes: string;
+  ingredients: string[];
+  steps: string[];
+};
 
 export default function AddScreen() {
   const router = useRouter();
@@ -17,10 +31,10 @@ export default function AddScreen() {
   const { session } = useAuth();
 
   const [name, setName] = useState('');
-  const [category, setCategory] = useState('Jantar');
+  const [category, setCategory] = useState<RecipeCategory>('Jantar');
   const [time, setTime] = useState(30);
   const [portions, setPortions] = useState(4);
-  const [difficulty, setDifficulty] = useState<typeof DIFFS[number]>('Médio');
+  const [difficulty, setDifficulty] = useState<Difficulty>('Médio');
   const [notes, setNotes] = useState('');
   const [ingredients, setIngredients] = useState(['', '']);
   const [steps, setSteps] = useState(['', '']);
@@ -28,6 +42,8 @@ export default function AddScreen() {
   const [discardDialog, setDiscardDialog] = useState<{ open: boolean; pendingHref?: string }>({ open: false });
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
+  const [photo, setPhoto] = useState<{ file: File; preview: string } | null>(null);
+  const photoInput = useRef<HTMLInputElement>(null);
 
   const cats = CATEGORIES.map(c => c.name);
 
@@ -39,6 +55,25 @@ export default function AddScreen() {
       steps.some(s => s.trim() !== '')
     );
   }, [name, notes, ingredients, steps]);
+
+  // Restaura rascunho salvo localmente
+  useEffect(() => {
+    const stored = localStorage.getItem(DRAFT_KEY);
+    if (!stored) return;
+    try {
+      const draft = JSON.parse(stored) as Draft;
+      setName(draft.name);
+      setCategory(draft.category);
+      setTime(draft.time);
+      setPortions(draft.portions);
+      setDifficulty(draft.difficulty);
+      setNotes(draft.notes);
+      setIngredients(draft.ingredients);
+      setSteps(draft.steps);
+    } catch {
+      localStorage.removeItem(DRAFT_KEY); // rascunho corrompido não trava a tela
+    }
+  }, []);
 
   // Register nav guard — shows dialog if form is dirty, allows nav if clean
   useEffect(() => {
@@ -67,9 +102,28 @@ export default function AddScreen() {
     }
   };
 
+  const saveDraft = () => {
+    const draft: Draft = { name, category, time, portions, difficulty, notes, ingredients, steps };
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+  };
+
   const handleSaveDraft = () => {
+    saveDraft();
     setDiscardDialog({ open: false });
-    // TODO: persist draft
+    if (discardDialog.pendingHref) {
+      unregisterGuard();
+      router.push(discardDialog.pendingHref);
+    }
+  };
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // permite reescolher o mesmo arquivo
+    if (!file) return;
+    setPhoto(current => {
+      if (current) URL.revokeObjectURL(current.preview);
+      return { file, preview: URL.createObjectURL(file) };
+    });
   };
 
   const validate = () => {
@@ -83,27 +137,40 @@ export default function AddScreen() {
 
   const handleSave = async () => {
     if (!validate()) return;
-    if (!session?.access_token) return;
+    if (!session) { router.push('/auth/login?redirect=/adicionar'); return; }
+
     setSaving(true);
     setSaveError('');
+
+    // O id é gerado aqui para que a foto já suba sob o path definitivo
+    const id = crypto.randomUUID();
+
     try {
-      await createRecipe({
+      const img_url = photo ? await uploadImage(photo.file, 'recipes', id) : undefined;
+
+      const result = await createRecipe({
+        id,
         name: name.trim(),
         category,
         time_min: time,
         difficulty,
         portions,
         notes: notes.trim() || undefined,
+        img_url,
         is_public: false,
         ingredients: ingredients.filter(i => i.trim()),
         steps: steps
           .filter(s => s.trim())
           .map((s, i) => ({ title: `Passo ${i + 1}`, body: s.trim() })),
-      }, session.access_token);
+      });
+
+      if (!result.ok) { setSaveError(result.error); return; }
+
+      localStorage.removeItem(DRAFT_KEY);
       unregisterGuard();
-      router.push('/');
+      router.push(`/receita/${result.data}`);
     } catch {
-      setSaveError('Erro ao salvar. Tente novamente.');
+      setSaveError('Não foi possível enviar a foto. Tente novamente.');
     } finally {
       setSaving(false);
     }
@@ -124,31 +191,47 @@ export default function AddScreen() {
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}><IconBack /></button>
           <div style={{ fontFamily: T.sans, fontSize: 15, fontWeight: 700, color: T.text }}>Nova receita</div>
-          <button style={{
+          <button onClick={saveDraft} style={{
             padding: '0 16px', height: 42, borderRadius: 14,
             background: 'transparent', border: 'none', color: T.textMuted,
-            fontFamily: T.sans, fontSize: 13, fontWeight: 600,
+            fontFamily: T.sans, fontSize: 13, fontWeight: 600, cursor: 'pointer',
           }}>Rascunho</button>
         </div>
 
         {/* Photo upload */}
         <div style={{ padding: '4px 24px 0' }}>
-          <div data-testid="photo-upload-area" style={{
-            height: 200, borderRadius: 22,
-            background: T.card, border: '2px dashed rgba(255,255,255,0.1)',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            gap: 12, cursor: 'pointer',
-          }}>
+          <input
+            ref={photoInput}
+            type="file"
+            accept="image/*"
+            onChange={handlePhotoChange}
+            style={{ display: 'none' }}
+          />
+          <div
+            data-testid="photo-upload-area"
+            onClick={() => photoInput.current?.click()}
+            style={{
+              height: 200, borderRadius: 22,
+              background: photo ? `center / cover no-repeat url(${photo.preview})` : T.card,
+              border: '2px dashed rgba(255,255,255,0.1)',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              gap: 12, cursor: 'pointer', position: 'relative', overflow: 'hidden',
+            }}>
+            {photo && <div style={{ position: 'absolute', inset: 0, background: 'rgba(13,13,13,0.55)' }} />}
             <div style={{
-              width: 56, height: 56, borderRadius: 18,
+              width: 56, height: 56, borderRadius: 18, zIndex: 1,
               background: T.amberSoft, border: `1px solid ${T.amberMid}`,
               display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.amber,
             }}>
               <IconCamera />
             </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 14.5, fontWeight: 700, color: T.text }}>Adicionar foto</div>
-              <div style={{ fontSize: 12, color: T.textDim, marginTop: 2 }}>Mostre o prato finalizado</div>
+            <div style={{ textAlign: 'center', zIndex: 1 }}>
+              <div style={{ fontSize: 14.5, fontWeight: 700, color: T.text }}>
+                {photo ? 'Trocar foto' : 'Adicionar foto'}
+              </div>
+              <div style={{ fontSize: 12, color: T.textDim, marginTop: 2 }}>
+                {photo ? photo.file.name : 'Mostre o prato finalizado'}
+              </div>
             </div>
           </div>
         </div>

@@ -1,11 +1,14 @@
 import { notFound } from 'next/navigation';
-import { fetchPublicRecipe } from '@/lib/db';
+import { fetchRecipe, fetchFavoriteIds } from '@/lib/db';
 import { DetailClient } from './detail-client';
 
 export const dynamic = 'force-dynamic';
 
 export default async function RecipeDetailPage({ params }: { params: { id: string } }) {
-  const recipe = await fetchPublicRecipe(params.id);
+  const [recipe, favoriteIds] = await Promise.all([
+    fetchRecipe(params.id),
+    fetchFavoriteIds(),
+  ]);
   if (!recipe) notFound();
-  return <DetailClient recipe={recipe} />;
+  return <DetailClient recipe={recipe} favorited={favoriteIds.includes(params.id)} />;
 }

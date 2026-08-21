@@ -25,11 +25,14 @@ export default function CadastroPage() {
     if (password !== confirm) { setError('As senhas não conferem.'); return; }
 
     setLoading(true);
-    const { error } = await signUp(email, password);
+    const { error, needsConfirmation } = await signUp(email, password);
     setLoading(false);
 
     if (error) { setError(error); return; }
-    setDone(true);
+    if (needsConfirmation) { setDone(true); return; }
+
+    router.push('/');
+    router.refresh();
   };
 
   if (done) {

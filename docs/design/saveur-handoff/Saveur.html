@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<title>Saveur — App de receitas</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
+<style>
+  html, body { margin: 0; padding: 0; background: #181412; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Manrope', -apple-system, system-ui, sans-serif; }
+  /* Hide scrollbars inside phone screens */
+  *::-webkit-scrollbar { display: none; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script src="data.js"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="shared.jsx"></script>
+<script type="text/babel" src="screen-home.jsx"></script>
+<script type="text/babel" src="screen-detail.jsx"></script>
+<script type="text/babel" src="screen-add.jsx"></script>
+<script type="text/babel" src="screen-profile.jsx"></script>
+
+<script type="text/babel" data-presets="env,react">
+const T = window.SAVEUR_TOKENS;
+
+// Each artboard owns its own internal navigation so the prototype is
+// actually interactive — tap a recipe card → opens detail in-place. The
+// Detail artboard's back button returns Home. The Add artboard's back
+// button reopens the prompt to add.
+
+function HomeArtboard() {
+  const [screen, setScreen] = React.useState({ name: 'home' });
+  return (
+    <Phone>
+      {screen.name === 'home' && (
+        <HomeScreen
+          onOpenRecipe={(r) => setScreen({ name: 'detail', recipe: r })}
+          onTabChange={(t) => { if (t === 'add') setScreen({ name: 'add' }); }}
+        />
+      )}
+      {screen.name === 'detail' && (
+        <DetailScreen recipe={screen.recipe} onBack={() => setScreen({ name: 'home' })} />
+      )}
+      {screen.name === 'add' && (
+        <AddScreen onBack={() => setScreen({ name: 'home' })} />
+      )}
+      {screen.name !== 'detail' && screen.name !== 'add' && (
+        <BottomNav active="home" onChange={(t) => {
+          if (t === 'add') setScreen({ name: 'add' });
+        }} />
+      )}
+    </Phone>
+  );
+}
+
+function DetailArtboard() {
+  const [screen, setScreen] = React.useState({ name: 'detail', recipe: window.SAVEUR_RECIPES[0] });
+  return (
+    <Phone>
+      {screen.name === 'detail' && (
+        <DetailScreen recipe={screen.recipe} onBack={() => setScreen({ name: 'home' })} />
+      )}
+      {screen.name === 'home' && (
+        <>
+          <HomeScreen
+            onOpenRecipe={(r) => setScreen({ name: 'detail', recipe: r })}
+            onTabChange={() => {}}
+          />
+          <BottomNav active="recipes" />
+        </>
+      )}
+    </Phone>
+  );
+}
+
+function AddArtboard() {
+  const [done, setDone] = React.useState(false);
+  return (
+    <Phone>
+      {!done ? (
+        <AddScreen onBack={() => setDone(true)} />
+      ) : (
+        <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 40, textAlign: 'center', color: T.text, background: T.bg }}>
+          <div style={{ width: 80, height: 80, borderRadius: 24, background: T.amberSoft, border: `1px solid ${T.amberMid}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.amber, marginBottom: 24 }}>
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none"><path d="M4 12l5 5L20 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </div>
+          <div style={{ fontFamily: T.display, fontSize: 26, fontWeight: 400, letterSpacing: -0.4 }}>Receita salva</div>
+          <div style={{ fontSize: 14, color: T.textMuted, marginTop: 8, lineHeight: 1.5 }}>Você pode encontrá-la em <br/>Receitas → Minhas criações</div>
+          <button onClick={() => setDone(false)} style={{
+            marginTop: 28, padding: '14px 22px', borderRadius: 14, cursor: 'pointer',
+            background: T.amber, border: 'none', color: '#0D0D0D',
+            fontFamily: T.sans, fontSize: 14, fontWeight: 700,
+          }}>Adicionar outra</button>
+        </div>
+      )}
+      <BottomNav active="add" />
+    </Phone>
+  );
+}
+
+function ProfileArtboard() {
+  const [screen, setScreen] = React.useState({ name: 'profile' });
+  return (
+    <Phone>
+      {screen.name === 'profile' && (
+        <ProfileScreen onOpenRecipe={(r) => setScreen({ name: 'detail', recipe: r })} />
+      )}
+      {screen.name === 'detail' && (
+        <DetailScreen recipe={screen.recipe} onBack={() => setScreen({ name: 'profile' })} />
+      )}
+      {screen.name !== 'detail' && (
+        <BottomNav active="profile" />
+      )}
+    </Phone>
+  );
+}
+
+function App() {
+  return (
+    <DesignCanvas>
+      <DCSection id="saveur" title="Saveur" subtitle="App mobile para salvar e organizar receitas · iOS · 390 × 844">
+        <DCArtboard id="home" label="01 · Home feed" width={390} height={844} style={{ background: T.bg, borderRadius: 44 }}>
+          <HomeArtboard />
+        </DCArtboard>
+        <DCArtboard id="detail" label="02 · Detalhes da receita" width={390} height={844} style={{ background: T.bg, borderRadius: 44 }}>
+          <DetailArtboard />
+        </DCArtboard>
+        <DCArtboard id="add" label="03 · Adicionar receita" width={390} height={844} style={{ background: T.bg, borderRadius: 44 }}>
+          <AddArtboard />
+        </DCArtboard>
+        <DCArtboard id="profile" label="04 · Perfil" width={390} height={844} style={{ background: T.bg, borderRadius: 44 }}>
+          <ProfileArtboard />
+        </DCArtboard>
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
