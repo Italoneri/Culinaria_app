@@ -9,7 +9,7 @@ type AuthContextValue = {
   session: Session | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
-  signUp: (email: string, password: string) => Promise<{ error: string | null }>;
+  signUp: (email: string, password: string) => Promise<{ error: string | null; needsConfirmation: boolean }>;
   signOut: () => Promise<void>;
 };
 
@@ -45,8 +45,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = async (email: string, password: string) => {
     const supabase = createSupabaseBrowserClient();
-    const { error } = await supabase.auth.signUp({ email, password });
-    return { error: error?.message ?? null };
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    // Sem sessão de volta, o projeto exige confirmação por email antes do login
+    return { error: error?.message ?? null, needsConfirmation: !error && !data.session };
   };
 
   const signOut = async () => {

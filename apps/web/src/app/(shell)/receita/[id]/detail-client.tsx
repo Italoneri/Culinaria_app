@@ -13,11 +13,11 @@ import {
 
 type Tab = 'ingredients' | 'steps';
 
-export function DetailClient({ recipe }: { recipe: Recipe }) {
+export function DetailClient({ recipe, favorited: initialFavorited }: { recipe: Recipe; favorited?: boolean }) {
   const router = useRouter();
   const [checked, setChecked] = useState<Record<number, boolean>>({});
   const [tab, setTab] = useState<Tab>('ingredients');
-  const { favorited, toggle } = useFavorite(recipe.id);
+  const { favorited, toggle } = useFavorite(recipe.id, initialFavorited);
 
   const toggleCheck = (i: number) => setChecked(c => ({ ...c, [i]: !c[i] }));
 

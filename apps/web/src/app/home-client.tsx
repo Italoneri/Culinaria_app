@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { NavGuardProvider } from '@/components/ui/nav-guard-context';
+import { useAuth } from '@/lib/auth-context';
 import { BottomNav } from '@/components/ui/bottom-nav';
 import { T } from '@/lib/tokens';
 import { FeaturedCard, RecipeCard, MiniCard } from '@/components/ui/recipe-card';
@@ -11,12 +12,27 @@ import type { Recipe, Category } from '@/lib/data';
 type Props = {
   recipes: Recipe[];
   categories: Category[];
+  favoriteIds: string[];
 };
 
-export default function HomeClient({ recipes, categories }: Props) {
+const WEEKDAYS = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+
+export default function HomeClient({ recipes, categories, favoriteIds }: Props) {
+  const { user } = useAuth();
   const [activeCat, setActiveCat] = useState('Todas');
+  const [query, setQuery] = useState('');
   const cats = ['Todas', ...categories.map(c => c.name)];
-  const filtered = activeCat === 'Todas' ? recipes : recipes.filter(r => r.category === activeCat);
+  const searching = query.trim() !== '';
+
+  const filtered = recipes
+    .filter(r => activeCat === 'Todas' || r.category === activeCat)
+    .filter(r => !searching || matchesQuery(r, query));
+
+  // Buscando, a lista mostra todos os resultados; parada, o primeiro vira destaque
+  const featured = searching ? null : filtered[0];
+  const listed = searching ? filtered : filtered.slice(1, 5);
+  const favorited = new Set(favoriteIds);
+  const firstName = user?.user_metadata?.name ?? user?.email?.split('@')[0] ?? 'Chef';
 
   return (
     <NavGuardProvider>
@@ -33,8 +49,8 @@ export default function HomeClient({ recipes, categories }: Props) {
                   color: T.amber, fontFamily: T.display, fontSize: 22, fontWeight: 400, fontStyle: 'italic',
                 }}>S</div>
                 <div>
-                  <div data-testid="greeting-day" style={{ fontSize: 11, color: T.textDim, fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase' }}>Sexta-feira</div>
-                  <div data-testid="greeting-name" style={{ fontSize: 13, color: T.textMuted, fontWeight: 500, marginTop: 1 }}>Olá, Mariana</div>
+                  <div data-testid="greeting-day" style={{ fontSize: 11, color: T.textDim, fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase' }}>{WEEKDAYS[new Date().getDay()]}</div>
+                  <div data-testid="greeting-name" style={{ fontSize: 13, color: T.textMuted, fontWeight: 500, marginTop: 1 }}>Olá, {firstName}</div>
                 </div>
               </div>
               <button style={{
@@ -59,13 +75,22 @@ export default function HomeClient({ recipes, categories }: Props) {
               <span style={{ fontStyle: 'italic', color: T.amber }}>cozinhar</span> hoje?
             </h1>
 
-            <div data-testid="search-bar" style={{
+            <div style={{
               marginTop: 22, height: 50, borderRadius: 16,
               background: T.card, border: `1px solid ${T.border}`,
               display: 'flex', alignItems: 'center', padding: '0 16px', gap: 10,
             }}>
               <IconSearch style={{ color: T.textDim }} />
-              <span style={{ fontSize: 14.5, color: T.textDim, fontWeight: 500, flex: 1 }}>Buscar receita, ingrediente…</span>
+              <input
+                data-testid="search-bar"
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder="Buscar receita, ingrediente…"
+                style={{
+                  flex: 1, border: 'none', background: 'transparent', outline: 'none',
+                  fontFamily: T.sans, fontSize: 14.5, color: T.text, fontWeight: 500,
+                }}
+              />
               <div style={{
                 width: 32, height: 32, borderRadius: 10, background: T.amberSoft,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.amber,
@@ -101,7 +126,7 @@ export default function HomeClient({ recipes, categories }: Props) {
             })}
           </div>
 
-          {filtered[0] && <FeaturedCard recipe={filtered[0]} />}
+          {featured && <FeaturedCard recipe={featured} favorited={favorited.has(featured.id)} />}
 
           <div data-testid="section-saved-recently" style={{ padding: '8px 24px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
             <div>
@@ -113,14 +138,23 @@ export default function HomeClient({ recipes, categories }: Props) {
             <span style={{ fontSize: 12.5, color: T.amber, fontWeight: 600 }}>Ver todas →</span>
           </div>
 
-          {filtered.slice(1, 5).length === 0 ? (
+          {listed.length === 0 ? (
             <div data-testid="empty-state" style={{ padding: '32px 24px', textAlign: 'center', color: T.textDim, fontSize: 14, fontFamily: T.sans }}>
-              Nenhuma receita encontrada nessa categoria.
+              {searching ? (
+                <>
+                  <div>Nenhuma receita encontrada para “{query}”.</div>
+                  <button onClick={() => setQuery('')} style={{
+                    marginTop: 16, padding: '10px 18px', borderRadius: 999, cursor: 'pointer',
+                    background: T.amberSoft, border: `1px solid ${T.amberMid}`, color: T.amber,
+                    fontFamily: T.sans, fontSize: 13, fontWeight: 600,
+                  }}>Explorar todas as receitas</button>
+                </>
+              ) : 'Nenhuma receita encontrada nessa categoria.'}
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '0 24px' }}>
-              {filtered.slice(1, 5).map(r => (
-                <RecipeCard key={r.id} recipe={r} />
+              {listed.map(r => (
+                <RecipeCard key={r.id} recipe={r} favorited={favorited.has(r.id)} />
               ))}
             </div>
           )}
@@ -141,5 +175,13 @@ export default function HomeClient({ recipes, categories }: Props) {
         <BottomNav />
       </div>
     </NavGuardProvider>
+  );
+}
+
+function matchesQuery(recipe: Recipe, query: string) {
+  const needle = query.trim().toLowerCase();
+  return (
+    recipe.name.toLowerCase().includes(needle) ||
+    recipe.ingredients.some(i => i.toLowerCase().includes(needle))
   );
 }

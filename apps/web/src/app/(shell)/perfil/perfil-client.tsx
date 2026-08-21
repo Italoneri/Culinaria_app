@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { T } from '@/lib/tokens';
 import { useAuth } from '@/lib/auth-context';
-import { updateProfile } from '@/lib/api-client';
-import type { Profile } from '@/lib/api-client';
-import type { Recipe } from '@/lib/data';
+import { updateProfile } from '@/lib/actions';
+import { uploadImage } from '@/lib/supabase';
+import type { Profile, Recipe } from '@/lib/data';
 import { IconClock, IconChevron, IconHeart, IconPencil } from '@/components/ui/icons';
 
 const COLLECTIONS = [
@@ -25,8 +26,11 @@ type Props = {
 };
 
 export default function PerfilClient({ initialProfile, initialFavorites }: Props) {
+  const router = useRouter();
   const { session, user } = useAuth();
+  const avatarInput = useRef<HTMLInputElement>(null);
   const [editMode, setEditMode] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
   const [editName, setEditName] = useState(initialProfile?.username ?? '');
   const [editBio, setEditBio] = useState(initialProfile?.bio ?? '');
   const [editCity, setEditCity] = useState('São Paulo');
@@ -34,23 +38,43 @@ export default function PerfilClient({ initialProfile, initialFavorites }: Props
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
 
-  const avatarUrl = initialProfile?.avatar_url ?? FALLBACK_AVATAR;
+  const [avatarOverride, setAvatarOverride] = useState<string | null>(null);
+  const avatarUrl = avatarOverride ?? initialProfile?.avatar_url ?? FALLBACK_AVATAR;
   const displayName = editName || user?.email?.split('@')[0] || 'Chef';
   const isPremium = initialProfile?.is_premium ?? false;
 
   const handleSave = async () => {
     if (!editName.trim()) { setNameError('Nome é obrigatório'); return; }
-    if (!session?.access_token) return;
+    if (!session) { router.push('/auth/login?redirect=/perfil'); return; }
     setNameError('');
     setSaveError('');
     setSaving(true);
+
+    const result = await updateProfile({ username: editName.trim(), bio: editBio.trim() });
+    setSaving(false);
+
+    if (!result.ok) { setSaveError(result.error); return; }
+    setEditMode(false);
+    router.refresh();
+  };
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // permite reescolher o mesmo arquivo
+    if (!file || !user) return;
+
+    setSaveError('');
+    setAvatarUploading(true);
     try {
-      await updateProfile({ username: editName.trim(), bio: editBio.trim() }, session.access_token);
-      setEditMode(false);
+      const url = await uploadImage(file, 'avatars', user.id);
+      const result = await updateProfile({ avatar_url: url });
+      if (!result.ok) { setSaveError(result.error); return; }
+      setAvatarOverride(url);
+      router.refresh();
     } catch {
-      setSaveError('Erro ao salvar. Tente novamente.');
+      setSaveError('Não foi possível enviar a foto. Tente novamente.');
     } finally {
-      setSaving(false);
+      setAvatarUploading(false);
     }
   };
 
@@ -88,7 +112,14 @@ export default function PerfilClient({ initialProfile, initialFavorites }: Props
             position: 'absolute', inset: -6, borderRadius: '50%',
             border: `1px solid ${T.amberSoft}`, pointerEvents: 'none',
           }} />
-          <button data-testid="btn-change-avatar" style={{
+          <input
+            ref={avatarInput}
+            type="file"
+            accept="image/*"
+            onChange={handleAvatarChange}
+            style={{ display: 'none' }}
+          />
+          <button data-testid="btn-change-avatar" onClick={() => avatarInput.current?.click()} disabled={avatarUploading} style={{
             position: 'absolute', bottom: -2, right: -2,
             width: 32, height: 32, borderRadius: 12, cursor: 'pointer',
             background: T.amber, border: `3px solid ${T.bg}`, color: '#0D0D0D',

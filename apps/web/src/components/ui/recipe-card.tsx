@@ -6,8 +6,8 @@ import type { Recipe } from '@/lib/data';
 import { useFavorite } from '@/lib/use-favorite';
 import { IconClock, IconSignal, IconBookmarkFill, IconClock as ClockSm, IconFlame } from './icons';
 
-export function FeaturedCard({ recipe }: { recipe: Recipe }) {
-  const { favorited, toggle } = useFavorite(recipe.id);
+export function FeaturedCard({ recipe, favorited: initialFavorited }: { recipe: Recipe; favorited?: boolean }) {
+  const { favorited, toggle } = useFavorite(recipe.id, initialFavorited);
   return (
     <Link data-testid="featured-card" href={`/receita/${recipe.id}`} style={{
       display: 'block', margin: '20px 24px 28px', borderRadius: 24, overflow: 'hidden',
@@ -61,8 +61,8 @@ export function FeaturedCard({ recipe }: { recipe: Recipe }) {
   );
 }
 
-export function RecipeCard({ recipe }: { recipe: Recipe }) {
-  const { favorited, toggle } = useFavorite(recipe.id);
+export function RecipeCard({ recipe, favorited: initialFavorited }: { recipe: Recipe; favorited?: boolean }) {
+  const { favorited, toggle } = useFavorite(recipe.id, initialFavorited);
   return (
     <Link data-testid="recipe-card" href={`/receita/${recipe.id}`} style={{
       display: 'flex', borderRadius: 20, background: T.card, border: `1px solid ${T.border}`,
