@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { T } from '@/lib/tokens';
 import { useAuth } from '@/lib/auth-context';
 import { updateProfile } from '@/lib/actions';
-import { uploadImage } from '@/lib/supabase';
+import { uploadImage, isSupportedImage, UnsupportedImageError } from '@/lib/supabase';
 import type { Profile, Recipe } from '@/lib/data';
 import { IconClock, IconChevron, IconHeart, IconPencil } from '@/components/ui/icons';
 
@@ -62,6 +62,10 @@ export default function PerfilClient({ initialProfile, initialFavorites }: Props
     const file = e.target.files?.[0];
     e.target.value = ''; // permite reescolher o mesmo arquivo
     if (!file || !user) return;
+    if (!isSupportedImage(file)) {
+      setSaveError(new UnsupportedImageError().message);
+      return;
+    }
 
     setSaveError('');
     setAvatarUploading(true);
@@ -71,8 +75,10 @@ export default function PerfilClient({ initialProfile, initialFavorites }: Props
       if (!result.ok) { setSaveError(result.error); return; }
       setAvatarOverride(url);
       router.refresh();
-    } catch {
-      setSaveError('Não foi possível enviar a foto. Tente novamente.');
+    } catch (error) {
+      setSaveError(error instanceof UnsupportedImageError
+        ? error.message
+        : 'Não foi possível enviar a foto. Tente novamente.');
     } finally {
       setAvatarUploading(false);
     }

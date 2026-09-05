@@ -19,8 +19,15 @@ export default defineConfig({
   },
   projects: [
     {
+      name: 'setup',
+      testMatch: /auth\.setup\.ts/,
+    },
+    {
       name: 'chromium-mobile',
-      use: { ...devices['Pixel 5'] },
+      // Sessão gravada pelo projeto 'setup'. /adicionar, /perfil e /configuracoes
+      // passam pelo middleware de auth; sem isto viram redirect para o login.
+      use: { ...devices['Pixel 5'], storageState: 'e2e/.auth/user.json' },
+      dependencies: ['setup'],
     },
   ],
   webServer: {

@@ -34,6 +34,9 @@ export function FeaturedCard({ recipe, favorited: initialFavorited }: { recipe: 
       </div>
       <button
         onClick={toggle}
+        aria-label="Salvar receita"
+        aria-pressed={favorited}
+        data-saved={favorited}
         style={{
           position: 'absolute', top: 14, right: 14, width: 38, height: 38, borderRadius: 12,
           background: favorited ? T.amber : 'rgba(0,0,0,0.55)', backdropFilter: 'blur(10px)',
@@ -91,7 +94,12 @@ export function RecipeCard({ recipe, favorited: initialFavorited }: { recipe: Re
           <span data-testid="recipe-difficulty" style={{ display: 'flex', alignItems: 'center', gap: 4 }}><IconSignal style={{ width: 12, height: 12 }} /> {recipe.difficulty}</span>
         </div>
       </div>
-      <button onClick={toggle} style={{
+      <button
+        onClick={toggle}
+        aria-label="Salvar receita"
+        aria-pressed={favorited}
+        data-saved={favorited}
+        style={{
         border: 'none', cursor: 'pointer',
         width: 32, height: 32, borderRadius: 10, alignSelf: 'flex-start',
         display: 'flex', alignItems: 'center', justifyContent: 'center',

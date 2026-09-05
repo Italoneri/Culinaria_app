@@ -8,6 +8,8 @@
 | **Médio** | BUG-001 | Adicionar | Category chips no AddScreen sem `data-testid` | Corrigido |
 | **Baixo** | BUG-002 | Adicionar | `stepper-time-value` inclui label "min" no textContent | Corrigido |
 | **Alto** | BUG-003 | Infra/E2E | Chrome worker crash `0xC0000142` cascata 120 falhas | Aberto |
+| **Crítico** | BUG-004 | Infra/E2E | Suíte E2E não roda: projeto Supabase inacessível (`ENOTFOUND`) | Aberto |
+| **Alto** | BUG-005 | Infra/E2E | Specs escritas contra rotas e seletores que não existem mais | Corrigido |
 
 ---
 
@@ -129,4 +131,64 @@ Rodar com `--workers=1` ou configurar `workers: 1` no `playwright.config.ts` par
 
 ---
 
-*Última atualização: 2026-05-24*
+### BUG-004 — Suíte E2E não roda: projeto Supabase inacessível
+
+**Severidade:** Crítico
+**Área:** Infra / E2E
+**Reportado em:** 2026-09-04
+**Status:** Aberto
+**Responsável:** architect
+
+**Descrição:**
+O host em `NEXT_PUBLIC_SUPABASE_URL` não resolve. Toda leitura de dado falha antes de sair da máquina, então nem a suíte E2E nem a verificação manual dos fluxos de conta (sair, alterar senha, excluir conta) podem rodar.
+
+**Passos para reproduzir:**
+1. `cd apps/web && pnpm dev`
+2. Abrir `/`
+
+**Resultado esperado:**
+Feed de receitas.
+
+**Resultado atual:**
+`GET / 500`. No log do servidor:
+
+```
+{"level":"error","operation":"fetchRecipes","code":"","message":"TypeError: fetch failed"}
+⨯ Caused by: Error: getaddrinfo ENOTFOUND <projeto>.supabase.co (ENOTFOUND)
+```
+
+O app degrada como deveria — a tela de erro aparece no lugar da tela branca (`error.tsx`), e o logger registra a operação. O bloqueio é de infraestrutura, não de código.
+
+**Impacto:**
+Bloqueia: aplicar `supabase/migrations/20260904000001_account_security.sql`; rodar `pnpm test:e2e` (o `auth.setup.ts` precisa autenticar contra o projeto); e verificar manualmente logout, redefinição de senha e exclusão de conta.
+
+**Destravar:**
+Religar ou recriar o projeto Supabase, aplicar as três migrations em ordem, criar a conta de teste em `/auth/cadastro`, rodar `supabase/seed.sql` para ela e exportar `E2E_EMAIL` / `E2E_PASSWORD`.
+
+---
+
+### BUG-005 — Specs escritas contra rotas e seletores que não existem mais
+
+**Severidade:** Alto
+**Área:** Infra / E2E
+**Reportado em:** 2026-09-04
+**Status:** Corrigido — commit `fix: give the e2e suite an auth fixture and current selectors`
+**Responsável:** qa-tester
+
+**Descrição:**
+O último relatório verde (`test-results/.last-run.json`) é de 2026-05-24, anterior ao middleware de auth e à migração para Supabase. A suíte passou a afirmar coisas que deixaram de ser verdade:
+
+1. `navigation.spec.ts` esperava `/add` e `/profile` — rotas que nunca existiram no app em português.
+2. As abas do bottom nav são `<button>` com `router.push`, não `<a>`; `getByRole('link')` não casava com nenhuma.
+3. Os botões de bookmark e o sino de notificações não tinham nome acessível, então `getByRole('button', { name: /salvar/i })` e `/notificações/i` não achavam nada.
+4. Sem `storageState`, o middleware mandava `/adicionar` e `/perfil` para o login e as specs dessas telas expiravam procurando um testid que nunca aparecia.
+
+**Correção:**
+Projeto `setup` no `playwright.config.ts` grava a sessão em `e2e/.auth/user.json`; rotas e seletores atualizados; `aria-label` + `data-saved` nos bookmarks e `aria-label` no sino.
+
+**Pendente:**
+A execução verde depende do BUG-004. As asserções de pixel e cor exata (`toHaveCSS('height', '380px')`, `rgb(232, 160, 32)`) seguem como estavam e ainda não foram revalidadas contra dados reais do banco.
+
+---
+
+*Última atualização: 2026-09-04*

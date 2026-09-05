@@ -1,3 +1,5 @@
+export const IMAGE_BUCKET = 'saveur-images';
+
 export const RECIPE_CATEGORIES = ['Café da manhã', 'Almoço', 'Jantar', 'Sobremesa', 'Snacks'] as const;
 export type RecipeCategory = typeof RECIPE_CATEGORIES[number];
 

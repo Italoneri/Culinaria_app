@@ -3,7 +3,8 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createSupabaseServerClient } from './supabase-server'
-import { RECIPE_CATEGORIES, DIFFICULTIES } from './data'
+import { logger } from './logger'
+import { RECIPE_CATEGORIES, DIFFICULTIES, IMAGE_BUCKET } from './data'
 
 const difficultySchema = z.enum(DIFFICULTIES)
 const categorySchema = z.enum(RECIPE_CATEGORIES)
@@ -42,12 +43,50 @@ export type ActionResult<T = void> =
   | { ok: false; error: string }
 
 const UNAUTHENTICATED = 'Sessão expirada. Entre novamente.'
+const INVALID_IMAGE = 'Imagem inválida: só são aceitas imagens enviadas pelo próprio app.'
+const GENERIC_WRITE_ERROR = 'Não foi possível salvar. Tente novamente.'
+
+/**
+ * A mensagem crua do Postgres nomeia tabela e constraint — informação de dentro
+ * do banco que não tem por que chegar ao browser. O cliente recebe a versão de
+ * usuário; a crua fica no log do servidor.
+ */
+const MESSAGE_BY_PG_CODE: Record<string, string> = {
+  '23505': 'Essa receita já foi salva.',
+  '23503': 'Receita não encontrada.',
+  '23514': 'Algum campo está fora do formato aceito.',
+  '42501': 'Sem permissão para essa operação.',
+}
+
+function userMessage(code: string | undefined): string {
+  return (code && MESSAGE_BY_PG_CODE[code]) || GENERIC_WRITE_ERROR
+}
+
+const STORAGE_PUBLIC_BASE = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${IMAGE_BUCKET}/`
+
+/**
+ * A URL da imagem chega pronta do client, então precisa ser confinada ao bucket
+ * e à pasta do próprio usuário — sem isso qualquer URL externa seria persistida
+ * e servida como se fosse a foto da receita. `new URL` normaliza `..`, então
+ * travessia de path não escapa do prefixo esperado.
+ */
+function isOwnStorageUrl(candidate: string, userId: string): boolean {
+  try {
+    const parsed = new URL(candidate)
+    const expected = new URL(`${STORAGE_PUBLIC_BASE}${userId}/`)
+    return parsed.origin === expected.origin && parsed.pathname.startsWith(expected.pathname)
+  } catch {
+    return false
+  }
+}
 
 /**
  * Cria a receita e suas linhas filhas. O `id` vem pronto do client para que a
  * foto já possa ter sido enviada ao Storage sob esse id antes do insert.
  */
 export async function createRecipe(input: CreateRecipeInput): Promise<ActionResult<string>> {
+  const startedAt = Date.now()
+
   const parsed = createRecipeSchema.safeParse(input)
   if (!parsed.success) {
     return { ok: false, error: 'Dados da receita inválidos' }
@@ -59,11 +98,23 @@ export async function createRecipe(input: CreateRecipeInput): Promise<ActionResu
 
   const { ingredients, steps, ...recipe } = parsed.data
 
+  if (recipe.img_url && !isOwnStorageUrl(recipe.img_url, user.id)) {
+    return { ok: false, error: INVALID_IMAGE }
+  }
+
   const { error: recipeError } = await supabase
     .from('recipes')
     .insert({ ...recipe, owner_id: user.id })
 
-  if (recipeError) return { ok: false, error: recipeError.message }
+  if (recipeError) {
+    logger.error('createRecipe', {
+      userId: user.id,
+      durationMs: Date.now() - startedAt,
+      code: recipeError.code,
+      message: recipeError.message,
+    })
+    return { ok: false, error: userMessage(recipeError.code) }
+  }
 
   const [{ error: ingredientsError }, { error: stepsError }] = await Promise.all([
     supabase.from('recipe_ingredients').insert(
@@ -80,15 +131,34 @@ export async function createRecipe(input: CreateRecipeInput): Promise<ActionResu
     ),
   ])
 
-  if (ingredientsError || stepsError) {
+  const childError = ingredientsError ?? stepsError
+  if (childError) {
+    logger.error('createRecipe.children', {
+      userId: user.id,
+      durationMs: Date.now() - startedAt,
+      code: childError.code,
+      message: childError.message,
+    })
+
     // A receita sem ingredientes nem passos é lixo — desfaz para não deixar meia-receita
-    await supabase.from('recipes').delete().eq('id', recipe.id)
-    return { ok: false, error: (ingredientsError ?? stepsError)!.message }
+    const { error: rollbackError } = await supabase.from('recipes').delete().eq('id', recipe.id)
+    if (rollbackError) {
+      // Sobrou meia-receita no banco. Precisa de gente olhando, não de retry.
+      logger.error('createRecipe.rollbackFailed', {
+        userId: user.id,
+        code: rollbackError.code,
+        message: rollbackError.message,
+      })
+    }
+
+    return { ok: false, error: userMessage(childError.code) }
   }
 
   revalidatePath('/')
   revalidatePath('/receitas')
   revalidatePath('/perfil')
+
+  logger.info('createRecipe', { userId: user.id, durationMs: Date.now() - startedAt })
 
   return { ok: true, data: recipe.id }
 }
@@ -106,7 +176,10 @@ export async function toggleFavorite(recipeId: string, favorited: boolean): Prom
     ? await supabase.from('favorites').upsert({ user_id: user.id, recipe_id: recipeId })
     : await supabase.from('favorites').delete().eq('user_id', user.id).eq('recipe_id', recipeId)
 
-  if (error) return { ok: false, error: error.message }
+  if (error) {
+    logger.error('toggleFavorite', { userId: user.id, code: error.code, message: error.message })
+    return { ok: false, error: userMessage(error.code) }
+  }
 
   revalidatePath('/')
   revalidatePath('/receitas')
@@ -125,12 +198,19 @@ export async function updateProfile(input: UpdateProfileInput): Promise<ActionRe
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { ok: false, error: UNAUTHENTICATED }
 
+  if (parsed.data.avatar_url && !isOwnStorageUrl(parsed.data.avatar_url, user.id)) {
+    return { ok: false, error: INVALID_IMAGE }
+  }
+
   const { error } = await supabase
     .from('profiles')
     .update(parsed.data)
     .eq('id', user.id)
 
-  if (error) return { ok: false, error: error.message }
+  if (error) {
+    logger.error('updateProfile', { userId: user.id, code: error.code, message: error.message })
+    return { ok: false, error: userMessage(error.code) }
+  }
 
   revalidatePath('/perfil')
 

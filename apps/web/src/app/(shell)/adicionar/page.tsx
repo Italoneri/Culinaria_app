@@ -8,7 +8,7 @@ import { T } from '@/lib/tokens';
 import { useNavGuard } from '@/components/ui/nav-guard-context';
 import { useAuth } from '@/lib/auth-context';
 import { createRecipe } from '@/lib/actions';
-import { uploadImage } from '@/lib/supabase';
+import { uploadImage, isSupportedImage, UnsupportedImageError } from '@/lib/supabase';
 import { IconBack, IconPlus, IconClock, IconUsers, IconSignal, IconCamera, IconBookmarkFill } from '@/components/ui/icons';
 
 const DIFFS = DIFFICULTIES;
@@ -120,6 +120,11 @@ export default function AddScreen() {
     const file = e.target.files?.[0];
     e.target.value = ''; // permite reescolher o mesmo arquivo
     if (!file) return;
+    if (!isSupportedImage(file)) {
+      setSaveError(new UnsupportedImageError().message);
+      return;
+    }
+    setSaveError('');
     setPhoto(current => {
       if (current) URL.revokeObjectURL(current.preview);
       return { file, preview: URL.createObjectURL(file) };
@@ -169,8 +174,10 @@ export default function AddScreen() {
       localStorage.removeItem(DRAFT_KEY);
       unregisterGuard();
       router.push(`/receita/${result.data}`);
-    } catch {
-      setSaveError('Não foi possível enviar a foto. Tente novamente.');
+    } catch (error) {
+      setSaveError(error instanceof UnsupportedImageError
+        ? error.message
+        : 'Não foi possível enviar a foto. Tente novamente.');
     } finally {
       setSaving(false);
     }

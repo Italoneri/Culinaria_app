@@ -53,7 +53,7 @@ export default function HomeClient({ recipes, categories, favoriteIds }: Props) 
                   <div data-testid="greeting-name" style={{ fontSize: 13, color: T.textMuted, fontWeight: 500, marginTop: 1 }}>Olá, {firstName}</div>
                 </div>
               </div>
-              <button style={{
+              <button aria-label="Notificações" style={{
                 border: `1px solid ${T.border}`, background: 'rgba(255,255,255,0.03)',
                 width: 40, height: 40, borderRadius: 14,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',

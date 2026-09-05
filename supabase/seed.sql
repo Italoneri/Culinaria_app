@@ -17,12 +17,19 @@ BEGIN
     RETURN;
   END IF;
 
-  -- O trigger handle_new_user já criou a linha em profiles no signup
-  UPDATE profiles
-  SET username = 'Mariana Silva',
-      bio = 'Cozinheira amadora apaixonada por massas, pães e tudo que leva manteiga',
-      is_premium = true
-  WHERE id = dev_user_id;
+  -- Upsert em vez de update: contas criadas antes do schema existir não passaram
+  -- pelo trigger handle_new_user e não têm linha em profiles
+  INSERT INTO profiles (id, username, bio, is_premium)
+  VALUES (
+    dev_user_id,
+    'Mariana Silva',
+    'Cozinheira amadora apaixonada por massas, pães e tudo que leva manteiga',
+    true
+  )
+  ON CONFLICT (id) DO UPDATE
+    SET username = EXCLUDED.username,
+        bio = EXCLUDED.bio,
+        is_premium = EXCLUDED.is_premium;
 
   -- Recipes
   INSERT INTO recipes (id, owner_id, name, category, time_min, difficulty, portions, calories, img_url, description, is_public)

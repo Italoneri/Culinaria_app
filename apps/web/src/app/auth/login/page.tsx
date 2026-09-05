@@ -6,25 +6,47 @@ import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import { T } from '@/lib/tokens';
 
+const CALLBACK_ERRORS: Record<string, string> = {
+  missing_code: 'Link de confirmação incompleto. Peça um novo email.',
+  invalid_code: 'Link de confirmação expirado ou já usado. Entre com email e senha.',
+};
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get('redirect') ?? '/';
-  const { signIn } = useAuth();
+  const { signIn, requestPasswordReset } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState(CALLBACK_ERRORS[searchParams.get('error') ?? ''] ?? '');
+  const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setNotice('');
     setLoading(true);
     const { error } = await signIn(email, password);
     setLoading(false);
     if (error) { setError(error); return; }
     router.push(redirect);
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      setError('Preencha o email para receber o link de redefinição.');
+      return;
+    }
+
+    setError('');
+    setLoading(true);
+    const result = await requestPasswordReset(email.trim());
+    setLoading(false);
+
+    if (result.error) { setError(result.error); return; }
+    setNotice('Link de redefinição enviado. Confira seu email.');
   };
 
   return (
@@ -50,10 +72,11 @@ function LoginForm() {
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <label style={{ fontFamily: T.sans, fontSize: 12, fontWeight: 700, color: T.textMuted, letterSpacing: 0.4, textTransform: 'uppercase' }}>
+            <label htmlFor="login-email" style={{ fontFamily: T.sans, fontSize: 12, fontWeight: 700, color: T.textMuted, letterSpacing: 0.4, textTransform: 'uppercase' }}>
               Email
             </label>
             <input
+              id="login-email"
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
@@ -70,10 +93,11 @@ function LoginForm() {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <label style={{ fontFamily: T.sans, fontSize: 12, fontWeight: 700, color: T.textMuted, letterSpacing: 0.4, textTransform: 'uppercase' }}>
+            <label htmlFor="login-senha" style={{ fontFamily: T.sans, fontSize: 12, fontWeight: 700, color: T.textMuted, letterSpacing: 0.4, textTransform: 'uppercase' }}>
               Senha
             </label>
             <input
+              id="login-senha"
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
@@ -90,12 +114,22 @@ function LoginForm() {
           </div>
 
           {error && (
-            <div style={{
+            <div role="alert" style={{
               padding: '12px 14px', borderRadius: 12,
               background: 'rgba(255,80,80,0.08)', border: '1px solid rgba(255,80,80,0.2)',
               fontFamily: T.sans, fontSize: 13, color: '#ff6b6b', fontWeight: 500,
             }}>
               {error}
+            </div>
+          )}
+
+          {notice && (
+            <div role="status" data-testid="reset-notice" style={{
+              padding: '12px 14px', borderRadius: 12,
+              background: T.amberSoft, border: `1px solid ${T.amberMid}`,
+              fontFamily: T.sans, fontSize: 13, color: T.amber, fontWeight: 600,
+            }}>
+              {notice}
             </div>
           )}
 
@@ -113,6 +147,20 @@ function LoginForm() {
             }}
           >
             {loading ? 'Entrando…' : 'Entrar'}
+          </button>
+
+          <button
+            type="button"
+            data-testid="btn-forgot-password"
+            onClick={handleForgotPassword}
+            disabled={loading}
+            style={{
+              marginTop: 2, padding: 8, background: 'none', border: 'none',
+              fontFamily: T.sans, fontSize: 13, fontWeight: 600, color: T.textMuted,
+              cursor: loading ? 'not-allowed' : 'pointer',
+            }}
+          >
+            Esqueci minha senha
           </button>
         </form>
 

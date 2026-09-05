@@ -35,5 +35,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/adicionar', '/perfil'],
+  matcher: ['/adicionar', '/perfil', '/configuracoes'],
 }
