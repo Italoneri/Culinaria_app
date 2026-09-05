@@ -58,3 +58,35 @@ export async function uploadImage(file: File, kind: ImageKind, id: string): Prom
   const { data } = supabase.storage.from(IMAGE_BUCKET).getPublicUrl(path)
   return `${data.publicUrl}?v=${Date.now()}`
 }
+
+const IMAGE_KINDS: readonly ImageKind[] = ['recipes', 'avatars']
+
+/**
+ * Esvazia a pasta `<uid>/` antes da conta ser apagada.
+ *
+ * Best-effort de propósito: o ON DELETE CASCADE do banco não alcança o
+ * Storage, e travar a exclusão da conta porque uma imagem resistiu seria pior
+ * que a imagem órfã. Falha vira aviso no console, não exceção.
+ */
+export async function deleteOwnImages(userId: string): Promise<void> {
+  const supabase = createSupabaseBrowserClient()
+
+  for (const kind of IMAGE_KINDS) {
+    const folder = `${userId}/${kind}`
+    const { data, error } = await supabase.storage.from(IMAGE_BUCKET).list(folder)
+
+    if (error) {
+      console.warn(`[saveur] não foi possível listar ${folder}`, error.message)
+      continue
+    }
+    if (!data || data.length === 0) continue
+
+    const { error: removeError } = await supabase.storage
+      .from(IMAGE_BUCKET)
+      .remove(data.map(file => `${folder}/${file.name}`))
+
+    if (removeError) {
+      console.warn(`[saveur] não foi possível limpar ${folder}`, removeError.message)
+    }
+  }
+}
