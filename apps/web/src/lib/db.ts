@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from './supabase-server'
+import { logger } from './logger'
 import { CATEGORIES } from './data'
 import type { Recipe, Category, Profile } from './data'
 
@@ -25,7 +26,10 @@ export async function fetchRecipes(filters: { category?: string; q?: string } = 
   if (filters.q) query = query.ilike('name', `%${filters.q}%`)
 
   const { data, error } = await query
-  if (error) throw error
+  if (error) {
+    logger.error('fetchRecipes', { code: error.code, message: error.message })
+    throw error
+  }
 
   return (data ?? []).map(normalizeRecipe)
 }
@@ -39,7 +43,14 @@ export async function fetchRecipe(id: string): Promise<Recipe | null> {
     .eq('id', id)
     .maybeSingle()
 
-  if (error || !data) return null
+  // Banco fora do ar não é receita inexistente: propagar cai no error.tsx,
+  // devolver null mandaria o usuário para um 404 mentiroso.
+  if (error) {
+    logger.error('fetchRecipe', { code: error.code, message: error.message })
+    throw error
+  }
+
+  if (!data) return null
   return normalizeRecipe(data)
 }
 
@@ -47,7 +58,10 @@ export async function fetchCategories(): Promise<Category[]> {
   const supabase = createSupabaseServerClient()
 
   const { data, error } = await supabase.from('recipes').select('category')
-  if (error) throw error
+  if (error) {
+    logger.error('fetchCategories', { code: error.code, message: error.message })
+    throw error
+  }
 
   const counts: Record<string, number> = {}
   for (const row of data ?? []) {
@@ -61,8 +75,13 @@ export async function fetchCategories(): Promise<Category[]> {
 export async function fetchFavoriteIds(): Promise<string[]> {
   const supabase = createSupabaseServerClient()
 
+  // Feed sem os corações preenchidos ainda é um feed, então o fallback vazio
+  // fica — o que não pode é falhar calado.
   const { data, error } = await supabase.from('favorites').select('recipe_id')
-  if (error) return []
+  if (error) {
+    logger.warn('fetchFavoriteIds', { code: error.code, message: error.message })
+    return []
+  }
 
   return (data ?? []).map(row => row.recipe_id as string)
 }
@@ -80,7 +99,10 @@ export async function fetchFavorites(): Promise<Recipe[]> {
     .order('created_at', { ascending: false })
     .limit(50)
 
-  if (error) throw error
+  if (error) {
+    logger.error('fetchFavorites', { code: error.code, message: error.message })
+    throw error
+  }
 
   return (data ?? []).map(normalizeRecipe)
 }
