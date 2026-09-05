@@ -232,14 +232,14 @@ test.describe('US-03 · Add recipe', () => {
     test('switching bottom nav tab with unsaved content shows discard dialog', async ({ page }) => {
       await page.getByTestId('input-recipe-name').fill('Receita incompleta');
       // Tap Home tab in bottom nav while form is dirty
-      await page.getByRole('link', { name: /^home$/i }).click();
+      await page.getByTestId('nav-home').click();
       await expect(page.getByRole('dialog')).toBeVisible();
       await expect(page.getByRole('dialog')).toContainText('Deseja salvar como rascunho');
     });
 
     test('navigating away with no content does not show discard dialog', async ({ page }) => {
       // Form untouched — no dialog expected
-      await page.getByRole('link', { name: /^home$/i }).click();
+      await page.getByTestId('nav-home').click();
       await expect(page.getByRole('dialog')).not.toBeVisible();
       await expect(page).toHaveURL('/');
     });
